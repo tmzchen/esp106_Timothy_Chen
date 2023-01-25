@@ -8,23 +8,65 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+##########################
 
-## R Markdown
+# ESP 106
+**# Lab 3 (Monday) - graphing**
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+##########################
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+##setting up working directory  
+setwd("C:/Users/timmy/OneDrive/Desktop/ESP106/lab3/ESP106_week3_lab1")  
+**GDP = read.csv('gdppercapiandgini.csv')**  
+file.exists('gdppercapiandgini.csv')  
+**air = read.csv('airpollution.csv')**  
 
-```{r cars}
-summary(cars)
+###setting new column names  
+```
+colnames(GDP) = c('countries', 'code', 'year', 'population', 'continent', 'gini', 'GDP per capita')  
+colnames(GDP)  
+colnames(air) = c('countries', 'code', 'year', 'particulate matter', 'household', 'ozone', 'air pollution')  
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+###creating a variable for total outdoor air pollution: "total deaths"
+```
+totaldeaths = air$`particulate matter` + air$ozone
+_airpollution = cbind(air,totaldeaths)_
+`tw = airpollution[airpollution$countries=="Taiwan",]`
+`ch = subset(airpollution, countries=="China")`
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+##Plot1 comparing indoor and outdoor air pollution between China and Taiwan
+```par(mfrow=c(1,1))
+par(mar=c(5,4,2,2))
+p1 = plot(tw$year, tw$household, ylim = c(0, 120),
+     ylab = "Deaths per 100,000 people", 
+     xlab ="Year", type = "l", 
+     main = "Death rates from indoor and outdoor air pollution (1990-2015)", 
+     las = 1, lwd = 3, col = "skyblue"
+     )
+lines(tw$year, tw$totaldeaths, type = 'l', lwd = 3, lty = 3, col = "skyblue")
+lines(tw$year, ch$household, type = 'l', lwd = 3, col = "coral")
+lines(tw$year, ch$totaldeaths, type = 'l', lwd = 3, lty = 3, col = 'coral')
+legend("topright", c("Taiwan indoor", "Taiwan outdoor", "China indoor", "China outdoor"),
+        col = c('skyblue','skyblue','coral','coral'), lty = c(1, 3, 1, 3), lwd = 2)
+```
+
+###merging GDP and air pollution datas through countries, country code, and year
+colnames(airpollution)  
+colnames(GDP)  
+~~GDP~~  
+**airGDP = merge(GDP, airpollution, by = c("countries", "code", "year"))**
+colnames(airGDP)  
+
+##plot2 plotting Log GDP against indoor and outdoor air pollution death rates
+```par(mfrow=c(1,2))
+par(mar=c(5,4,4,2))
+indoor = plot(log(airGDP$`GDP per capita`), airGDP$household, type = "p", pch=20, cex=0.5, 
+     xlab = "log per Capita GDP", ylab = "deaths per 100,000 people", main = "Indoor air pollution",
+     las = 1, col="seagreen", ylim = c(0,300))
+out = plot(log10(airGDP$`GDP per capita`), airGDP$totaldeaths, type = "p", pch=20, cex=0.5,
+       xlab = "log per Capita GDP", ylab = "deaths per 100,000 people", main = "Outdoor air pollution",
+       las = 1, col = "orange1", ylim = c(0,300))
+```
+
