@@ -1,0 +1,147 @@
+---
+title: "Midterm 2_Timothy Chen"
+output:
+  html_document: default
+  word_document: default
+  pdf_document: default
+editor_options:
+  chunk_output_type: console
+---
+
+### Data 
+
+For this midterm you need to use two datasets:
+
+"chinalanduse_MODIS_2012.nc" contains four layers with land cover data for China. The data were derived from MODIS satellite data for the year 2012. Each layer gives the fraction of the grid cell that has a specific land cover type: urban (layer 1), cropland (layer 2), grassland (layer 3) and forest (layer 4). 
+
+"ch_adm.*" with polygons for the provinces of China.
+
+Q1. Read in the land use data as a SpatRaster get the polygons as a SpatVector (2 points)
+```{r}
+setwd("C:/Users/timmy/OneDrive/Desktop/ESP106/midterm2")
+library(terra)
+list.files()
+lu = rast("chinalanduse_MODIS_2012.nc")
+prov = vect("chn_adm.shp")
+```
+
+Q2a. Crop the land use SpatRaster to the same extent as the SpatVector of Chinese provinces (1 point), and set all grid cells outside of China to `NA`
+
+```{r}
+extp = ext(prov)
+lu = crop(lu, extp)
+```
+
+Q2b. Rename the layers in the SpatRaster so they provide information about what data is in each of the 4 layers (2 points)
+
+```{r}
+names(lu)
+names(lu) = c("Urban", "Cropland", "Grassland", "Forest")
+```
+
+Q3. Make a figure showing each SpatRaster layer on one of the panels and overlay the polygons of the Chinese provinces. Title each panel with the type of land use it shows. (4 points)
+
+```{r}
+dev.off()
+par(mfrow = c(2,2))
+plot(lu, "Urban", main = "Urban")
+polys(prov)
+plot(lu, "Cropland", main = "Cropland")
+prov1 = prov
+prov2 = prov
+prov3 = prov
+plot(prov1, add = TRUE)
+plot(lu, "Grassland", main = "Grassland")
+plot(prov2, add = TRUE)
+plot(lu, "Forest", main = "Forestland")
+plot(prov3, add = TRUE)
+
+#making clones of the province polygons was the only way I figured out how to attach a polygon to each layer of the raster. I tried plotting the entire raster first but it took too much time and was too complicated trying to align the polygon spatvector with each of the 4 layers. I tried looking for a function or an argument that could somehow combine the vector and raster together while plotting but to no avail, would be interested in learning a prettier solution to this!
+```
+
+Q4a. Use `terra::extract` to find the fraction of each province in each of the four land use classes. [For this question you can assume all the grid cells have the same size] (3 points)
+
+```{r}
+tot = terra::extract(lu, prov, sum)
+total = colSums(tot)
+total
+
+urb = terra::extract(lu$Urban, prov, sum, ID = FALSE)
+urb$Urban = urb$Urban / 14934.96
+
+crop = terra::extract(lu$Cropland, prov, fun = sum, ID = FALSE)
+crop$Cropland = crop$Cropland / 295860.16
+
+grass = terra::extract(lu$Grassland, prov, fun = sum, ID = FALSE)
+grass$Grassland = grass$Grassland / 547444
+
+forest = terra::extract(lu$Forest, prov, fun = sum, ID = FALSE)
+forest$Forest = forest$Forest / 18836.72
+
+#I used colsums to compute the total value is each of the raster layer (total land use), then divided each of the provinces total land use of that type by the total across all provinces
+```
+
+Q4b. Describe the potential problem with the area assumption made in 4a. How might it affect the calculation in that step? What could we do if we didn't want to make that assumption? (You don't have to do it, just describe in theory) (2 points)
+
+**If the cell sizes aren't the same, the values could be exaggerated or understated in the midst of the data, leading to inaccurate representation of proportion of land uses. A way to solve this is to use the aggregate function to change the cell sizes into 1 consistent size, further using the exact or weights argument within extract to get the fraction of cells that might be overlapping the polygon boundaries**
+
+
+Q4c. Sum up the fractions in the four land cover classes for each province and plot these as a histogram. (2 points) 
+
+```{r}
+total_frac = cbind(urb, crop, grass, forest)
+total_frac = cbind(total_frac, prov$NAME_1)
+colnames(total_frac) = c("Urban", "Cropland", "Grassland", "Forest", "Province")
+sumfrac = total_frac$Urban + total_frac$Cropland + total_frac$Grassland + total_frac$Forest
+total_frac = cbind(total_frac, sumfrac)
+
+dev.off()
+par(mar = c(5.5,4,2.5,4))
+hist(total_frac$sumfrac, breaks = 50, main = "summed up fraction of each land use of provinces", xlab = "summed fraction")
+```
+
+
+Q5. Add a new variable "other" to the data created with terra::extract, and give it the appropriate value. (2 points)
+
+```{r}
+other = 1 - total_frac$sumfrac
+total_frac = cbind(total_frac, other)
+```
+
+
+Q6. Make barplots showing the breakdown of urban, cropland, grassland, forest, and other for each province. The barplots should be "stacked" (a single bar for each province, showing land cover with a color) and "horizontal" (province names on the vertical axis).  
+
+Q6a) Use graphics::barplot, make sure to include a legend.  (4 points)
+
+```{r}
+only_frac = total_frac[,1:4]
+only_frac = cbind(only_frac, "Other" = total_frac[,7])
+only_frac = as.matrix(only_frac)
+only_frac = t(only_frac)
+colnames(only_frac) = prov$NAME_1
+prov$NAME_1
+
+par(mar = c(3.5,5,2,1))
+opar <- par(lwd = 0.2)
+graphics::barplot(only_frac, width = 1.5, beside = FALSE, legend.text = TRUE, horiz = TRUE, main = "land use by province", las = 1, cex.names = .5, col = c("grey", "yellow", "darkseagreen", "forestgreen", "bisque"))
+
+```
+
+Q6b) Use ggplot. (4 points) 
+
+```{r}
+library(ggplot2)
+library(tidyr)
+total_frac = total_frac[,c(1,2,3,4,7,5,6)]
+long_frac = pivot_longer(total_frac, cols = 1:5, names_to = "land use", values_to = "percentage")
+
+long_frac
+ggplot(long_frac, aes(y = Province, x = percentage, fill = `land use`)) + geom_bar(position = "stack", stat = "identity") +
+  theme_bw()
+
+#Its annoying how the fraction of urban was mostly on the left, but I couldn't find an argument that lets me reorder the "fill" of the stacked bar plot
+```
+
+
+Q7. Upload your R markdown file, and your knitted output to Canvas. Push the R markdown file to your Github repository. (2 points)
+
